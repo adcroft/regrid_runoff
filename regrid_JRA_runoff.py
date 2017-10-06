@@ -5,6 +5,7 @@ import glob
 import netCDF4
 import numpy
 from numba import jit
+import os.path
 import scipy.sparse
 
 # Process command-line arguments
@@ -227,7 +228,7 @@ def copy_meta(nc_in, nc_out, osize):
 
 def regrid(A, oarea, in_file, var_name='friver'):
   if args.debug: print('in_file =', in_file)
-  out_file = in_file[:-3] + '.%ix%i.nc'%(oarea.shape)
+  out_file = os.path.splitext( os.path.basename(in_file) )[0] + '.%ix%i.nc'%(oarea.shape)
   nc_in = netCDF4.Dataset(in_file)
   nc_out = netCDF4.Dataset(out_file, 'w', format='NETCDF3_CLASSIC', clobber=True)
   copy_meta(nc_in, nc_out, (1080,1440))
@@ -247,7 +248,9 @@ def regrid(A, oarea, in_file, var_name='friver'):
     out_var[n,:,:] = oflux[:,:]
     time[n] = nc_in.variables['time'][n]
     time_bnds[n,:] = nc_in.variables['time_bnds'][n,:]
+  nc_in.close()
+  nc_out.close()
 for arg in args.runoff_files:
   for a_file in glob.glob(arg):
-    if not args.quiet: print('Regridding ', a_file)
+    if not args.quiet: print('Regridding', a_file)
     regrid(A, oarea, a_file)
