@@ -10,6 +10,13 @@ The regridding algorithm here regrids runoff data to the ocean model grid and at
 that the discharge is "sharpened" in the direction normal to coastlines so that the discharge is only
 ever one cell away from and land-masked cell.
 
+## Usage
+
+```
+./regrid_JRA_runoff.py -h
+./regrid_JRA_runoff.py -sg ocean_hgrid.nc -om ocean_mask.nc -ra runoff_cell_area.15Dec2016.nc runoff_all.\*.15Dec2016.padded.nc 
+```
+
 ## Algorithm
 
 An [example notebook](https://gist.github.com/adcroft/8894494254777d7da0863b6a3cf69722) (used for
