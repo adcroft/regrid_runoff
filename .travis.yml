@@ -25,5 +25,6 @@ before_script:
   - popd
 
 script:
+  - ./regrid_runoff.py --help
   - ./regrid_runoff.py test_data/ocean_hgrid.nc test_data/ocean_static.nc -m wet test_data/runoff.daitren.clim.10FEB2011.nc test.nc -p
   - md5sum test.nc
