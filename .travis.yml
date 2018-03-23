@@ -1,0 +1,15 @@
+nguage: python
+
+python:
+  - "3.6"
+
+install:
+  - pip install --upgrade pip
+  - pip install netcdf4
+
+script:
+  - wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_hgrid.nc
+  - wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_static.nc
+  - wget http://data1.gfdl.noaa.gov/~nnz/mom4/COREv2/data_IAF/CORRECTED/calendar_years/runoff.daitren.clim.10FEB2011.nc
+  - ./regrid_runoff.py ocean_hgrid.nc ocean_static.nc -m wet runoff.daitren.clim.10FEB2011.nc test.nc -p
+  - md5sum test.nc
