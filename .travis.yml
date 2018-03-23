@@ -6,6 +6,7 @@ python:
 install:
   - pip install --upgrade pip
   - pip install netcdf4
+  - pip install numba
 
 script:
   - wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_hgrid.nc
