@@ -1,2 +1,4 @@
 *.nc
 *.swp
+.ipynb_checkpoints
+pickle.*
