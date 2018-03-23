@@ -1,5 +1,7 @@
 language: python
 
+cache: pip
+
 python:
   - "3.6"
 
@@ -7,7 +9,8 @@ install:
   - pip install --upgrade pip
   - pip install netcdf4
   - pip install numba
-
+  - pip install scipy
+  
 script:
   - wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_hgrid.nc
   - wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_static.nc
