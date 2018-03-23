@@ -1,8 +1,13 @@
 language: python
 
-cache: pip
+cache:
+  - pip
+  - test_data
 
 python:
+  - "2.7"
+  - "3.4"
+  - "3.5"
   - "3.6"
 
 install:
@@ -10,10 +15,16 @@ install:
   - pip install netcdf4
   - pip install numba
   - pip install scipy
-  
+
+# Fetch test data, if not cached
+before_script:
+  - mkdir -p test_data
+  - pushd test_data
+  - test -f ocean_hgrid.nc || wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_hgrid.nc
+  - test -f ocean_static.nc || wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_static.nc
+  - test -f runoff.daitren.clim.10FEB2011.nc || wget http://data1.gfdl.noaa.gov/~nnz/mom4/COREv2/data_IAF/CORRECTED/calendar_years/runoff.daitren.clim.10FEB2011.nc
+  - popd
+
 script:
-  - wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_hgrid.nc
-  - wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_025_grid.unpacked/ocean_static.nc
-  - wget http://data1.gfdl.noaa.gov/~nnz/mom4/COREv2/data_IAF/CORRECTED/calendar_years/runoff.daitren.clim.10FEB2011.nc
-  - ./regrid_runoff.py ocean_hgrid.nc ocean_static.nc -m wet runoff.daitren.clim.10FEB2011.nc test.nc -p
+  - ./regrid_runoff.py test_data/ocean_hgrid.nc test_data/ocean_static.nc -m wet test_data/runoff.daitren.clim.10FEB2011.nc test.nc -p
   - md5sum test.nc
