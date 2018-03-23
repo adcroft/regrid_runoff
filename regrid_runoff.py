@@ -224,8 +224,13 @@ def main(args):
 
   # Process runoff data
   if args.progress: tic = info('Regridding runoff and writing new file')
-  regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon )
+  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area )
   if args.progress: end_info(tic)
+
+  if not args.quiet:
+    for n in range(totals.shape[0]):
+      err = abs( totals[n,0] - totals[n,1] ) / totals[n,0]
+      print('Record %i, net source = %f kg/s, net regridded = %f kg/s, fractional error = %g'%(n,totals[n,0],totals[n,1],err))
 
 def nearest_coastal_cell( ocn_id, cst_mask ):
   cst_nrst_ocn_id = ocn_id * cst_mask - (1 - cst_mask) # Will have nearest oid of coastal cells (-1 for unassigned)
@@ -342,7 +347,7 @@ def brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, lat, lon):
   cost = numpy.abs( ocn_lat - lat) + numpy.abs( numpy.mod(ocn_lon - lon + 180, 360) - 180 )
   return numpy.argmin( cost )
 
-def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon ):
+def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, toler=1e-15 ):
   """Regrids runoff data using sparse matrix A and write new file"""
 
   new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format="NETCDF3_64BIT_OFFSET")
@@ -427,14 +432,22 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
 
   i_area = 1/ocn_area
 
+  totals = numpy.zeros((runoff.shape[0],2))
   for n in range(runoff.shape[0]):
     data = runoff[n]
     tim = old_file.variables[time][n]
     odata = ( A * data.flatten() ).reshape(ocn_area.shape)
     new_runoff[n] = i_area * odata
     t[n] = tim
+    totals[n,0] = (rvr_area * data ).sum()
+    totals[n,1] = odata.sum()
+    err = abs( totals[n,0] - totals[n,1] ) / totals[n,0]
+    if err>toler:
+      print('Non-conservation for record %i, net source = %f kg/s, net regridded = %f kg/s, fractional error = %g'%(n,totals[n,0],totals[n,1],err))
 
   new_file.close()
+
+  return totals
 
 # Invoke parseCommandLine(), the top-level prodedure
 if __name__ == '__main__':
