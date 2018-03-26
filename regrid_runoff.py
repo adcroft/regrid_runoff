@@ -33,6 +33,8 @@ def parseCommandLine():
       help="""Name of runoff variable in runoff_file.""")
   parser.add_argument('-r','--runoff_var', type=str, default='runoff',
       help="""Name of runoff variable in runoff_file.""")
+  parser.add_argument('-f','--fast_pickle', action='store_true',
+      help="""Use a pickled form of sparse matrix if available. This skips the matrix generation step if being re-applied to data.""")
   parser.add_argument('-c','--skip_coast', action='store_true',
       help="""Disable routing to nearest coastal cell.""")
   parser.add_argument('-p','--progress', action='store_true',
@@ -95,7 +97,7 @@ def main(args):
 
   # Read cached regridding matrix
   do_full_calculation = True
-  if os.path.exists(pickle_file):
+  if args.fast_pickle and os.path.exists(pickle_file):
     if args.progress: tic = info('Reading pickled sparse matrix')
     f = open(pickle_file, 'rb')
     A = pickle.load( f )
