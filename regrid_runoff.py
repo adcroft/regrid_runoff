@@ -33,6 +33,8 @@ def parseCommandLine():
       help="""Name of runoff variable in runoff_file.""")
   parser.add_argument('-r','--runoff_var', type=str, default='runoff',
       help="""Name of runoff variable in runoff_file.""")
+  parser.add_argument('-c','--skip_coast', action='store_true',
+      help="""Disable routing to nearest coastal cell.""")
   parser.add_argument('-p','--progress', action='store_true',
       help="""Report progress.""")
   parser.add_argument('-q','--quiet', action='store_true',
@@ -149,9 +151,10 @@ def main(args):
       print('There are %i/%i (%.2f%%) coastal cells on this ocean grid.'%(cst_mask.sum(),ocn_id.size,100*cst_mask.sum()/ocn_id.size))
 
     # Calculate nearest coastal cell
-    if args.progress: tic = info('Calculating nearest coastal cell on ocean grid (should take ~%.1fs)'%(6*ocn_mask.size/(1080*1440)))
-    cst_nrst_ocn_id = nearest_coastal_cell( ocn_id, cst_mask )
-    if args.progress: end_info(tic)
+    if not args.skip_coast:
+      if args.progress: tic = info('Calculating nearest coastal cell on ocean grid (should take ~%.1fs)'%(6*ocn_mask.size/(1080*1440)))
+      cst_nrst_ocn_id = nearest_coastal_cell( ocn_id, cst_mask )
+      if args.progress: end_info(tic)
 
     # Build k-d tree for ocean grid
     if args.progress: tic = info('Building k-d tree for ocean grid (should take ~%.1fs)'%(210*ocn_mask.size/(1080*1440)))
@@ -203,15 +206,20 @@ def main(args):
     del rids, oids, cnt
     if args.progress: end_info(tic)
 
-    if args.progress: tic = info('Constructing rerouting matrix for coastal cells')
-    Acst = scipy.sparse.lil_matrix( (ocn_nj*ocn_ni, ocn_nj*ocn_ni), dtype=numpy.double )
-    Acst[cst_nrst_ocn_id, ocn_id] = 1
-    if args.progress: end_info(tic)
+    if not args.skip_coast:
+      if args.progress: tic = info('Constructing rerouting matrix for coastal cells')
+      Acst = scipy.sparse.lil_matrix( (ocn_nj*ocn_ni, ocn_nj*ocn_ni), dtype=numpy.double )
+      Acst[cst_nrst_ocn_id, ocn_id] = 1
+      if args.progress: end_info(tic)
 
     if args.progress: tic = info('Constructing final sparse matrix')
-    A = Acst * ( Arow + Acol )
+    if args.skip_coast:
+      A = ( Arow + Acol )
+    else:
+      A = Acst * ( Arow + Acol )
+      del Acst
     A = A.tocsr()
-    del Acol, Arow, Acst
+    del Acol, Arow
     if args.progress: end_info(tic)
 
     if args.progress: tic = info('Pickling sparse matrix')
