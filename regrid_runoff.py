@@ -364,6 +364,12 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
     time = runoff.dimensions[0]
   else: time = None
 
+  # Calculate shift to align left of source domain with Greenwich meridian
+  old_lon = old_file.variables[runoff.dimensions[-1]]
+  dlon = 360. / old_lon.shape[0]
+  ishift = numpy.argmin( numpy.abs( old_lon[:] - dlon*0.5) )
+  del dlon, old_lon
+
   # Copy global attributes
   for a in old_file.ncattrs():
     new_file.setncattr(a, old_file.getncattr(a))
@@ -442,7 +448,10 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
 
   totals = numpy.zeros((runoff.shape[0],2))
   for n in range(runoff.shape[0]):
-    data = runoff[n]
+    if ishift == 0:
+      data = runoff[n]
+    else:
+      data = numpy.roll( runoff[n], -ishift, axis=-1 )
     tim = old_file.variables[time][n]
     odata = ( A * data.flatten() ).reshape(ocn_area.shape)
     new_runoff[n] = i_area * odata
