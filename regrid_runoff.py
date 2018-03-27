@@ -9,6 +9,7 @@ import pickle
 import scipy.sparse
 import sys
 import time
+import pyroms
 
 def parseCommandLine():
   """
@@ -22,16 +23,12 @@ def parseCommandLine():
       """,
       epilog='Written by A.Adcroft, 2013.')
   parser.add_argument('hgrid_file', type=str,
-      help="""Filename for ocean horizontal grid (super-grid format).""")
-  parser.add_argument('mask_file', type=str,
-      help="""Filename for ocean mask.""")
+      help="""Filename for ocean horizontal grid (pyroms gridid).""")
   parser.add_argument('runoff_file', type=str,
       help="""Filename for gridded source runoff data.""")
   parser.add_argument('out_file', type=str,
       help="""Filename for runoff data on ocean model grid.""")
-  parser.add_argument('-m','--mask_var', type=str, default='mask',
-      help="""Name of runoff variable in runoff_file.""")
-  parser.add_argument('-r','--runoff_var', type=str, default='runoff',
+  parser.add_argument('-r','--runoff_var', type=str, default='friver',
       help="""Name of runoff variable in runoff_file.""")
   parser.add_argument('-f','--fast_pickle', action='store_true',
       help="""Use a pickled form of sparse matrix if available. This skips the matrix generation step if being re-applied to data.""")
@@ -64,13 +61,16 @@ def main(args):
 
   # Open ocean grid
   if args.progress: tic = info('Reading ocean grid')
-  ocn_qlon = netCDF4.Dataset(args.hgrid_file).variables['x'][::2,::2]   # Mesh longitudes (cell corners)
-  ocn_qlat = netCDF4.Dataset(args.hgrid_file).variables['y'][::2,::2] # Mesh latitudes (cell corners)
-  ocn_lon = netCDF4.Dataset(args.hgrid_file).variables['x'][1::2,1::2]    # Cell-center longitudes (cell centers)
-  ocn_lat = netCDF4.Dataset(args.hgrid_file).variables['y'][1::2,1::2]  # Cell-center latitudes (cell centers)
-  ocn_area = netCDF4.Dataset(args.hgrid_file).variables['area'][:]      # Super-grid cell areas
-  ocn_area = ( ocn_area[::2,::2] + ocn_area[1::2,1::2] ) + ( ocn_area[1::2,::2] + ocn_area[::2,1::2] ) # Ocean-grid cell areas
-  ocn_mask = netCDF4.Dataset(args.mask_file).variables[args.mask_var][:] # 1=ocean, 0=land
+  ocn_grd = pyroms.grid.get_ROMS_grid(args.hgrid_file)
+  print('grid size', ocn_grd.hgrid.mask_rho.shape)
+  ocn_qlon = ocn_grd.hgrid.lon_psi[:,:]   # Mesh longitudes (cell corners)
+  ocn_qlat = ocn_grd.hgrid.lat_psi[:,:]   # Mesh latitudes (cell corners)
+  ocn_lon = ocn_grd.hgrid.lon_rho[1:-1,1:-1]    # Cell-center longitudes (cell centers)
+  ocn_lat = ocn_grd.hgrid.lat_rho[1:-1,1:-1]    # Cell-center latitudes (cell centers)
+  ocn_dx = ocn_grd.hgrid.dx[1:-1,1:-1]
+  ocn_dy = ocn_grd.hgrid.dy[1:-1,1:-1]
+  ocn_area = ocn_dx*ocn_dy                   # Ocean-grid cell areas
+  ocn_mask = ocn_grd.hgrid.mask_rho[1:-1,1:-1]  # Ocean-grid cell mask
   ocn_nj, ocn_ni = ocn_mask.shape
   ocn_id = numpy.arange( ocn_nj*ocn_ni ).reshape(ocn_mask.shape)
   if args.progress: end_info(tic)
@@ -176,7 +176,7 @@ def main(args):
 
     if not args.quiet:
       print('%i/%i river cells without associated ocean id (first pass).'%((rvr_oid<0).sum(),rvr_oid.size))
-   
+
     if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
     for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
       rj, ri = int(rid/rvr_ni), rid%rvr_ni
@@ -187,7 +187,7 @@ def main(args):
 
     if not args.quiet:
       print('%i/%i river cells without associated ocean id.'%((rvr_oid<0).sum(),rvr_oid.size))
-   
+
     # Construct sparse matrices
     if args.progress: tic = info('Constructing regridding matrix for river cells with many ocean cells')
     Arow = scipy.sparse.lil_matrix( (ocn_nj*ocn_ni, rvr_nj*rvr_ni), dtype=numpy.double )
