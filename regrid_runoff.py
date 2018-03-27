@@ -20,7 +20,7 @@ def parseCommandLine():
       """
       regrid_runoff.py regrids runoff data from a regular/uniform latitude-longitude grid to a curvilinear ocean grid
       """,
-      epilog='Written by A.Adcroft, 2013.')
+      epilog='Written by A.Adcroft, 2018.')
   parser.add_argument('hgrid_file', type=str,
       help="""Filename for ocean horizontal grid (super-grid format).""")
   parser.add_argument('mask_file', type=str,
