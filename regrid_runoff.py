@@ -33,6 +33,8 @@ def parseCommandLine():
       help="""Name of runoff variable in runoff_file.""")
   parser.add_argument('-r','--runoff_var', type=str, default='runoff',
       help="""Name of runoff variable in runoff_file.""")
+  parser.add_argument('-a','--ignore_area', action='store_true',
+      help="""Ignore the "area" variable in the source runoff file.""")
   parser.add_argument('-f','--fast_pickle', action='store_true',
       help="""Use a pickled form of sparse matrix if available. This skips the matrix generation step if being re-applied to data.""")
   parser.add_argument('-c','--skip_coast', action='store_true',
@@ -88,9 +90,12 @@ def main(args):
   rvr_qlat = numpy.arange(-90., 90.001, rvr_res)
   rvr_nj, rvr_ni = rvr_lat.size, rvr_lon.size
   rvr_id = numpy.arange(rvr_nj*rvr_ni,dtype=numpy.int32) # River grid cell id
-  Re, d2r = 6371.26e3, numpy.pi/180  # File had area => Re = 6371.26043437 km
-  rvr_area = numpy.outer( Re * ( numpy.sin( rvr_qlat[1:]*d2r ) - numpy.sin( rvr_qlat[:-1]*d2r ) ) ,Re*2*numpy.pi/rvr_ni*numpy.ones(rvr_ni))
-  del d2r, Re
+  if 'area' in runoff_file.variables:
+    rvr_area = runoff_file.variables['area'][:]
+  else:
+    Re, d2r = 6371.26e3, numpy.pi/180  # File had area => Re = 6371.26043437 km
+    rvr_area = numpy.outer( Re * ( numpy.sin( rvr_qlat[1:]*d2r ) - numpy.sin( rvr_qlat[:-1]*d2r ) ), Re*2*numpy.pi/rvr_ni*numpy.ones(rvr_ni))
+    del d2r, Re
   if args.progress: end_info(tic)
 
   if not args.quiet: print('Runoff grid shape is %i x %i.'%(rvr_nj, rvr_ni))
