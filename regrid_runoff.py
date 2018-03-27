@@ -367,7 +367,21 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   else: time = None
 
   # Calculate shift to align left of source domain with Greenwich meridian
-  old_lon = old_file.variables[runoff.dimensions[-1]]
+  if runoff.dimensions[-1] in old_file.variables:
+    # Follows CF convention of 1d coordinate variable
+    old_lon = old_file.variables[runoff.dimensions[-1]]
+  else:
+    # Work around for non CF-compliant file
+    for lvar in ['lon','Lon','LON','longitude','Longitude','LONGITUDE','xc','XC','x','X']:
+      if lvar in old_file.variables:
+        break
+    print(); print('WARNING! No coordinate variable for i-dimension. Using work around for "%s".'%(lvar)); print()
+    if len(old_file.variables[lvar].shape) == 1:
+      old_lon = old_file.variables[lvar][:]
+    elif len(old_file.variables[lvar].shape) == 2:
+      old_lon = old_file.variables[lvar][0,:]
+    else:
+      raise Exception('Coordinate variable has wrong shape!')
   dlon = 360. / old_lon.shape[0]
   ishift = numpy.argmin( numpy.abs( old_lon[:] - dlon*0.5) )
   del dlon, old_lon
