@@ -438,10 +438,14 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   area.long_name = 'Cell area'
   area.standard_name = 'cell_area'
   area.units = 'm2'
+  area.coordinates = 'lon lat'
+  area.mesh_coordinates = 'lon_crnr lat_crnr'
   if time is not None:
     new_runoff = new_file.createVariable(var_name, 'f4', ('time', 'j','i',))
   else:
     new_runoff = new_file.createVariable(var_name, 'f4', ('j','i',))
+  new_runoff.coordinates = 'lon lat'
+  new_runoff.mesh_coordinates = 'lon_crnr lat_crnr'
 
   # runoff attributes
   for a in old_file.variables[var_name].ncattrs():
