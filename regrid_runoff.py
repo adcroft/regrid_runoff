@@ -30,7 +30,7 @@ def parseCommandLine():
   parser.add_argument('out_file', type=str,
       help="""Filename for runoff data on ocean model grid.""")
   parser.add_argument('-m','--mask_var', type=str, default='mask',
-      help="""Name of runoff variable in runoff_file.""")
+      help="""Name of mask variable in mask_file.""")
   parser.add_argument('-r','--runoff_var', type=str, default='runoff',
       help="""Name of runoff variable in runoff_file.""")
   parser.add_argument('-a','--ignore_area', action='store_true',
