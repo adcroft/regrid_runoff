@@ -239,7 +239,7 @@ def main(args):
 
   # Process runoff data
   if args.progress: tic = info('Regridding runoff and writing new file')
-  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area )
+  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area )
   if args.progress: end_info(tic)
 
   if not args.quiet:
@@ -362,7 +362,7 @@ def brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, lat, lon):
   cost = numpy.abs( ocn_lat - lat) + numpy.abs( numpy.mod(ocn_lon - lon + 180, 360) - 180 )
   return numpy.argmin( cost )
 
-def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, toler=1e-15 ):
+def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, toler=1e-15 ):
   """Regrids runoff data using sparse matrix A and write new file"""
 
   new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format="NETCDF3_64BIT_OFFSET")
@@ -446,9 +446,13 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   area.coordinates = 'lon lat'
   area.mesh_coordinates = 'lon_crnr lat_crnr'
   if time is not None:
-    new_runoff = new_file.createVariable(var_name, 'f4', ('time', 'j','i',))
+    dims = ('time', 'j','i',)
   else:
-    new_runoff = new_file.createVariable(var_name, 'f4', ('j','i',))
+    dims = ('j','i',)
+  if '_FillValue' in old_file.variables[var_name].ncattrs():
+    new_runoff = new_file.createVariable(var_name, 'f4', dims, fill_value = old_file.variables[var_name]._FillValue)
+  else:
+    new_runoff = new_file.createVariable(var_name, 'f4', dims)
   new_runoff.coordinates = 'lon lat'
   new_runoff.mesh_coordinates = 'lon_crnr lat_crnr'
 
@@ -479,6 +483,7 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
       data = numpy.roll( runoff[n], -ishift, axis=-1 )
     tim = old_file.variables[time][n]
     odata = ( A * data.flatten() ).reshape(ocn_area.shape)
+    odata = numpy.ma.array( odata, mask=(ocn_mask==0) )
     new_runoff[n] = i_area * odata
     t[n] = tim
     totals[n,0] = (rvr_area * data ).sum()
