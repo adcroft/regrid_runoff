@@ -402,8 +402,8 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   ocn_nj, ocn_ni = ocn_area.shape
   new_file.createDimension('i',ocn_ni)
   new_file.createDimension('j',ocn_nj)
-  new_file.createDimension('I',ocn_ni+1)
-  new_file.createDimension('J',ocn_nj+1)
+  new_file.createDimension('IQ',ocn_ni+1)
+  new_file.createDimension('JQ',ocn_nj+1)
   if time is not None:
     new_file.createDimension('time',None)
 
@@ -412,9 +412,9 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   i.long_name = 'Grid position along first dimension'
   j = new_file.createVariable('j', 'f4', ('j',))
   j.long_name = 'Grid position along second dimension'
-  I = new_file.createVariable('I', 'f4', ('I',))
+  I = new_file.createVariable('IQ', 'f4', ('IQ',))
   I.long_name = 'Grid position along first dimension'
-  J = new_file.createVariable('J', 'f4', ('J',))
+  J = new_file.createVariable('JQ', 'f4', ('JQ',))
   J.long_name = 'Grid position along second dimension'
   if time is not None:
     t = new_file.createVariable('time', 'd', ('time',))
@@ -431,11 +431,11 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   lat.long_name = 'Latitude of cell centers'
   lat.standard_name = 'latitude'
   lat.units = 'degrees_north'
-  lonq = new_file.createVariable('lon_crnr', 'f4', ('J','I',))
+  lonq = new_file.createVariable('lon_crnr', 'f4', ('JQ','IQ',))
   lonq.long_name = 'Longitude of mesh nodes'
   lonq.standard_name = 'longitude'
   lonq.units = 'degrees_east'
-  latq = new_file.createVariable('lat_crnr', 'f4', ('J','I',))
+  latq = new_file.createVariable('lat_crnr', 'f4', ('JQ','IQ',))
   latq.long_name = 'Latitude of mesh nodes'
   latq.standard_name = 'latitude'
   latq.units = 'degrees_north'
