@@ -21,7 +21,7 @@ def parseCommandLine():
       """
       regrid_runoff.py regrids runoff data from a regular/uniform latitude-longitude grid to a curvilinear ocean grid
       """,
-      epilog='Written by A.Adcroft, 2013.')
+      epilog='Written by A.Adcroft, 2018.')
   parser.add_argument('hgrid_file', type=str,
       help="""Filename for ocean horizontal grid (pyroms gridid).""")
   parser.add_argument('runoff_file', type=str,
@@ -30,6 +30,8 @@ def parseCommandLine():
       help="""Filename for runoff data on ocean model grid.""")
   parser.add_argument('-r','--runoff_var', type=str, default='friver',
       help="""Name of runoff variable in runoff_file.""")
+  parser.add_argument('-a','--ignore_area', action='store_true',
+      help="""Ignore the "area" variable in the source runoff file.""")
   parser.add_argument('-f','--fast_pickle', action='store_true',
       help="""Use a pickled form of sparse matrix if available. This skips the matrix generation step if being re-applied to data.""")
   parser.add_argument('-c','--skip_coast', action='store_true',
@@ -88,9 +90,12 @@ def main(args):
   rvr_qlat = numpy.arange(-90., 90.001, rvr_res)
   rvr_nj, rvr_ni = rvr_lat.size, rvr_lon.size
   rvr_id = numpy.arange(rvr_nj*rvr_ni,dtype=numpy.int32) # River grid cell id
-  Re, d2r = 6371.26e3, numpy.pi/180  # File had area => Re = 6371.26043437 km
-  rvr_area = numpy.outer( Re * ( numpy.sin( rvr_qlat[1:]*d2r ) - numpy.sin( rvr_qlat[:-1]*d2r ) ) ,Re*2*numpy.pi/rvr_ni*numpy.ones(rvr_ni))
-  del d2r, Re
+  if 'area' in runoff_file.variables:
+    rvr_area = runoff_file.variables['area'][:]
+  else:
+    Re, d2r = 6371.26e3, numpy.pi/180  # File had area => Re = 6371.26043437 km
+    rvr_area = numpy.outer( Re * ( numpy.sin( rvr_qlat[1:]*d2r ) - numpy.sin( rvr_qlat[:-1]*d2r ) ), Re*2*numpy.pi/rvr_ni*numpy.ones(rvr_ni))
+    del d2r, Re
   if args.progress: end_info(tic)
 
   if not args.quiet: print('Runoff grid shape is %i x %i.'%(rvr_nj, rvr_ni))
@@ -234,7 +239,7 @@ def main(args):
 
   # Process runoff data
   if args.progress: tic = info('Regridding runoff and writing new file')
-  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area )
+  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area )
   if args.progress: end_info(tic)
 
   if not args.quiet:
@@ -357,7 +362,7 @@ def brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, lat, lon):
   cost = numpy.abs( ocn_lat - lat) + numpy.abs( numpy.mod(ocn_lon - lon + 180, 360) - 180 )
   return numpy.argmin( cost )
 
-def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, toler=1e-15 ):
+def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, toler=1e-15 ):
   """Regrids runoff data using sparse matrix A and write new file"""
 
   new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format="NETCDF3_64BIT_OFFSET")
@@ -367,7 +372,21 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   else: time = None
 
   # Calculate shift to align left of source domain with Greenwich meridian
-  old_lon = old_file.variables[runoff.dimensions[-1]]
+  if runoff.dimensions[-1] in old_file.variables:
+    # Follows CF convention of 1d coordinate variable
+    old_lon = old_file.variables[runoff.dimensions[-1]]
+  else:
+    # Work around for non CF-compliant file
+    for lvar in ['lon','Lon','LON','longitude','Longitude','LONGITUDE','xc','XC','x','X']:
+      if lvar in old_file.variables:
+        break
+    print(); print('WARNING! No coordinate variable for i-dimension. Using work around for "%s".'%(lvar)); print()
+    if len(old_file.variables[lvar].shape) == 1:
+      old_lon = old_file.variables[lvar][:]
+    elif len(old_file.variables[lvar].shape) == 2:
+      old_lon = old_file.variables[lvar][0,:]
+    else:
+      raise Exception('Coordinate variable has wrong shape!')
   dlon = 360. / old_lon.shape[0]
   ishift = numpy.argmin( numpy.abs( old_lon[:] - dlon*0.5) )
   del dlon, old_lon
@@ -383,8 +402,8 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   ocn_nj, ocn_ni = ocn_area.shape
   new_file.createDimension('i',ocn_ni)
   new_file.createDimension('j',ocn_nj)
-  new_file.createDimension('I',ocn_ni+1)
-  new_file.createDimension('J',ocn_nj+1)
+  new_file.createDimension('IQ',ocn_ni+1)
+  new_file.createDimension('JQ',ocn_nj+1)
   if time is not None:
     new_file.createDimension('time',None)
 
@@ -393,9 +412,9 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   i.long_name = 'Grid position along first dimension'
   j = new_file.createVariable('j', 'f4', ('j',))
   j.long_name = 'Grid position along second dimension'
-  I = new_file.createVariable('I', 'f4', ('I',))
+  I = new_file.createVariable('IQ', 'f4', ('IQ',))
   I.long_name = 'Grid position along first dimension'
-  J = new_file.createVariable('J', 'f4', ('J',))
+  J = new_file.createVariable('JQ', 'f4', ('JQ',))
   J.long_name = 'Grid position along second dimension'
   if time is not None:
     t = new_file.createVariable('time', 'd', ('time',))
@@ -412,11 +431,11 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   lat.long_name = 'Latitude of cell centers'
   lat.standard_name = 'latitude'
   lat.units = 'degrees_north'
-  lonq = new_file.createVariable('lon_crnr', 'f4', ('J','I',))
+  lonq = new_file.createVariable('lon_crnr', 'f4', ('JQ','IQ',))
   lonq.long_name = 'Longitude of mesh nodes'
   lonq.standard_name = 'longitude'
   lonq.units = 'degrees_east'
-  latq = new_file.createVariable('lat_crnr', 'f4', ('J','I',))
+  latq = new_file.createVariable('lat_crnr', 'f4', ('JQ','IQ',))
   latq.long_name = 'Latitude of mesh nodes'
   latq.standard_name = 'latitude'
   latq.units = 'degrees_north'
@@ -424,10 +443,18 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
   area.long_name = 'Cell area'
   area.standard_name = 'cell_area'
   area.units = 'm2'
+  area.coordinates = 'lon lat'
+  area.mesh_coordinates = 'lon_crnr lat_crnr'
   if time is not None:
-    new_runoff = new_file.createVariable(var_name, 'f4', ('time', 'j','i',))
+    dims = ('time', 'j','i',)
   else:
-    new_runoff = new_file.createVariable(var_name, 'f4', ('j','i',))
+    dims = ('j','i',)
+  if '_FillValue' in old_file.variables[var_name].ncattrs():
+    new_runoff = new_file.createVariable(var_name, 'f4', dims, fill_value = old_file.variables[var_name]._FillValue)
+  else:
+    new_runoff = new_file.createVariable(var_name, 'f4', dims)
+  new_runoff.coordinates = 'lon lat'
+  new_runoff.mesh_coordinates = 'lon_crnr lat_crnr'
 
   # runoff attributes
   for a in old_file.variables[var_name].ncattrs():
@@ -456,6 +483,7 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_qlat, ocn
       data = numpy.roll( runoff[n], -ishift, axis=-1 )
     tim = old_file.variables[time][n]
     odata = ( A * data.flatten() ).reshape(ocn_area.shape)
+    odata = numpy.ma.array( odata, mask=(ocn_mask==0) )
     new_runoff[n] = i_area * odata
     t[n] = tim
     totals[n,0] = (rvr_area * data ).sum()
