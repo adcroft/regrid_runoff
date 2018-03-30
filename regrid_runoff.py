@@ -455,6 +455,7 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
     new_runoff = new_file.createVariable(var_name, 'f4', dims)
   new_runoff.coordinates = 'lon lat'
   new_runoff.mesh_coordinates = 'lon_crnr lat_crnr'
+  new_runoff.standard_name = 'runoff_flux'
 
   # runoff attributes
   for a in old_file.variables[var_name].ncattrs():
