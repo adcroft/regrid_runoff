@@ -36,6 +36,10 @@ def parseCommandLine():
       help="""Use a pickled form of sparse matrix if available. This skips the matrix generation step if being re-applied to data.""")
   parser.add_argument('-c','--skip_coast', action='store_true',
       help="""Disable routing to nearest coastal cell.""")
+  parser.add_argument('-n','--num_records', type=int, default=-1,
+      help="""Number of records to write (default is to write all).""")
+  parser.add_argument('--fms', action='store_true',
+      help="""Add non-CF attributes to allow FMS to read data!""")
   parser.add_argument('-p','--progress', action='store_true',
       help="""Report progress.""")
   parser.add_argument('-q','--quiet', action='store_true',
@@ -239,7 +243,7 @@ def main(args):
 
   # Process runoff data
   if args.progress: tic = info('Regridding runoff and writing new file')
-  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area )
+  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, args.fms, args.num_records )
   if args.progress: end_info(tic)
 
   if not args.quiet:
@@ -362,7 +366,7 @@ def brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, lat, lon):
   cost = numpy.abs( ocn_lat - lat) + numpy.abs( numpy.mod(ocn_lon - lon + 180, 360) - 180 )
   return numpy.argmin( cost )
 
-def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, toler=1e-15 ):
+def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, fms_attr, num_records , toler=1e-15):
   """Regrids runoff data using sparse matrix A and write new file"""
 
   new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format="NETCDF3_64BIT_OFFSET")
@@ -410,8 +414,10 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   # 1d variables
   i = new_file.createVariable('i', 'f4', ('i',))
   i.long_name = 'Grid position along first dimension'
+  if fms_attr: i.cartesian_axis = 'X'
   j = new_file.createVariable('j', 'f4', ('j',))
   j.long_name = 'Grid position along second dimension'
+  if fms_attr: j.cartesian_axis = 'Y'
   I = new_file.createVariable('IQ', 'f4', ('IQ',))
   I.long_name = 'Grid position along first dimension'
   J = new_file.createVariable('JQ', 'f4', ('JQ',))
@@ -421,6 +427,12 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
     for a in old_file.variables[time].ncattrs():
       t.setncattr(a, old_file.variables[time].getncattr(a))
     t.long_name = 'Time'
+    if fms_attr:
+      t.cartesian_axis = 'T'
+      t.modulo = ' '
+      if num_records>0:
+        t.modulo_beg = '1948-01-01 00:00:00'
+        t.modulo_end = '%4.4i-01-01 00:00:00'%(1948+num_records/12)
 
   # 2d variables
   lon = new_file.createVariable('lon', 'f4', ('j','i',))
@@ -451,10 +463,12 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
     dims = ('j','i',)
   if '_FillValue' in old_file.variables[var_name].ncattrs():
     new_runoff = new_file.createVariable(var_name, 'f4', dims, fill_value = old_file.variables[var_name]._FillValue)
+    if fms_attr: new_runoff.missing_value = old_file.variables[var_name]._FillValue
   else:
     new_runoff = new_file.createVariable(var_name, 'f4', dims)
   new_runoff.coordinates = 'lon lat'
   new_runoff.mesh_coordinates = 'lon_crnr lat_crnr'
+  new_runoff.standard_name = 'runoff_flux'
 
   # runoff attributes
   for a in old_file.variables[var_name].ncattrs():
@@ -475,8 +489,10 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
 
   i_area = 1/ocn_area
 
-  totals = numpy.zeros((runoff.shape[0],2))
-  for n in range(runoff.shape[0]):
+  nrecs = runoff.shape[0]
+  if num_records>0: nrecs = num_records
+  totals = numpy.zeros((nrecs,2))
+  for n in range(nrecs):
     if ishift == 0:
       data = runoff[n]
     else:
