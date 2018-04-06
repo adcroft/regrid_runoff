@@ -98,7 +98,14 @@ The runoff is in kg/m2/sec and ROMS wants m^3/sec. Also, the rivers outside
 the domain all end up in the far NE coastal cell that maps from (-1,-1).
 Someone should probably fix this in regrid_runoff.py.
 
-4. Then there's the tracers... Seth gave me one year of daily values to
+4. Just because we can:
+
+```
+python squeeze_rivers.py JRA_Arctic_1980.nc squeeze.nc
+mv squeeze.nc JRA_Arctic_1980.nc
+```
+
+5. Then there's the tracers... Seth gave me one year of daily values to
 be reused year after year. We need a second, cyclic river\_time.
 Plus we need to hack ROMS to accept only one value per day - the new
 ONE\_TRACER\_SOURCE flag (or one value per horizontal location).
@@ -107,23 +114,16 @@ ONE\_TRACER\_SOURCE flag (or one value per horizontal location).
 python add_temp.py JRA_Arctic_1980.nc
 ```
 
-5. Finally, setting Vshape:
+6. Finally, setting Vshape:
 
 ```
 python set_vshape.py JRA_Arctic_1980.nc
 ```
 
-6. If using dyes:
+7. If using dyes:
 
 ```
 python add_dye.py
-```
-
-7. Just because we can:
-
-```
-python squeeze_rivers.py JRA_Arctic_1980.nc squeeze.nc
-mv squeeze.nc JRA_Arctic_1980.nc
 ```
 
 Or just use the run\_regrid script...

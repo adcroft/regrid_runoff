@@ -18,17 +18,13 @@ xi = nc_rivers.variables['river_Xposition'][:]
 eta = nc_rivers.variables['river_Eposition'][:]
 dir = nc_rivers.variables['river_direction'][:]
 runoff = nc_rivers.variables['river_transport'][:]
-temp = nc_rivers.variables['river_temp'][:]
-salt = nc_rivers.variables['river_salt'][:]
 time = nc_rivers.variables['river_time'][:]
-ttime = nc_rivers.variables['river_tracer_time'][:]
 
 run_180 = np.abs(runoff[180,:])
 print('Sum 5', np.sum(run_180))
 
 Nr = sign.shape[0]
 Nt = time.shape[0]
-Ntt = ttime.shape[0]
 count = 0
 
 year_sum = np.sum(runoff, axis=0)
@@ -45,8 +41,6 @@ xi2 = np.zeros((count))
 eta2 = np.zeros((count))
 dir2 = np.zeros((count))
 runoff2 = np.zeros((Nt, count))
-temp2 = np.zeros((Ntt, count))
-salt2 = np.zeros((Ntt, count))
 
 print('Squeezing down to', count, 'rivers')
 it = 0
@@ -57,7 +51,6 @@ for i in range(Nr):
         eta2[it] = eta[i]
         dir2[it] = dir[i]
         runoff2[:,it] = runoff[:,i]
-        temp2[:,it] = temp[:,i]
         river[it] = it+1
         it += 1
 
@@ -104,23 +97,12 @@ trans.long_name = 'river runoff vertically integrated mass transport'
 trans.units = 'meter3 second-1'
 trans.time = 'river_time'
 
-temp = out.createVariable('river_temp', 'f8', ('river_time','river'))
-temp.long_name = 'river runoff potential temperature'
-temp.units = 'Celsius'
-temp.time = 'river_time'
-
-salt = out.createVariable('river_salt', 'f8', ('river_time','river'))
-salt.long_name = 'river runoff salinity'
-salt.time = 'river_time'
-
 out.variables['river'][:] = river
 out.variables['river_sign'][:] = sign2
 out.variables['river_Xposition'][:] = xi2
 out.variables['river_Eposition'][:] = eta2
 out.variables['river_direction'][:] = dir2
 out.variables['river_transport'][:] = runoff2
-out.variables['river_temp'][:] = temp2
-out.variables['river_salt'][:] = salt2
 out.variables['river_time'][:] = time
 
 run_180 = np.abs(runoff2[180,:])
