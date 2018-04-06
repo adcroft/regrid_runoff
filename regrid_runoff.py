@@ -44,6 +44,8 @@ def parseCommandLine():
       help="""Report progress.""")
   parser.add_argument('-q','--quiet', action='store_true',
       help="""Disable informational messages.""")
+  parser.add_argument('--regional', action='store_true',
+      help="""For regional domains, don't assume tripolar, don't include remote rivers.""")
 
   return parser.parse_args()
 
@@ -150,12 +152,16 @@ def main(args):
     cst_mask[ (ocn_mask>0) & (numpy.roll(ocn_mask,1,axis=0)==0) ] = 1 # Land to the south
     #cst_mask[ (ocn_mask>0) & (numpy.roll(numpy.roll(ocn_mask,1,axis=0),1,axis=1)==0) ] = 1 # Land to the south-west
     #cst_mask[ (ocn_mask>0) & (numpy.roll(numpy.roll(ocn_mask,1,axis=0),-1,axis=1)==0) ] = 1 # Land to the south-east
-    nom = numpy.roll(ocn_mask,-1,axis=0) # Shift southward
-    nom[-1,:] = ocn_mask[-1,::-1] # Tri-polar fold
-    cst_mask[ (ocn_mask>0) & (nom==0) ] = 1 # Land to the north
+    if args.regional:
+      # Might have to get rid of all the "roll" stuff too
+      cst_mask[ (ocn_mask>0) & (numpy.roll(ocn_mask,-1,axis=0)==0) ] = 1 # Land to the north
+    else:
+      nom = numpy.roll(ocn_mask,-1,axis=0) # Shift southward
+      nom[-1,:] = ocn_mask[-1,::-1] # Tri-polar fold
+      cst_mask[ (ocn_mask>0) & (nom==0) ] = 1 # Land to the north
     #cst_mask[ (ocn_mask>0) & (numpy.roll(nom,1,axis=1)==0) ] = 1 # Land to the north-west
     #cst_mask[ (ocn_mask>0) & (numpy.roll(nom,-1,axis=1)==0) ] = 1 # Land to the north-east
-    del nom # Clean up
+      del nom # Clean up
     if args.progress: end_info(tic)
 
     if not args.quiet:
@@ -186,13 +192,15 @@ def main(args):
     if not args.quiet:
       print('%i/%i river cells without associated ocean id (first pass).'%((rvr_oid<0).sum(),rvr_oid.size))
 
-    if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
-    for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
-      rj, ri = int(rid/rvr_ni), rid%rvr_ni
-      oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
-      rvr_oid[rj, ri] = oid
-    del ri, rj, oid, rid
-    if args.progress: end_info(tic)
+    # Let some rivers be unmapped for regional domains (no Amazon in my usual domains)
+    if not args.regional:
+      if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
+      for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
+        rj, ri = int(rid/rvr_ni), rid%rvr_ni
+        oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
+        rvr_oid[rj, ri] = oid
+      del ri, rj, oid, rid
+      if args.progress: end_info(tic)
 
     if not args.quiet:
       print('%i/%i river cells without associated ocean id.'%((rvr_oid<0).sum(),rvr_oid.size))
