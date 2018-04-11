@@ -84,8 +84,8 @@ out.createDimension('s_rho', 50)
 
 times = out.createVariable('river_time', 'f8', ('river_time'))
 times.units = 'days'
-times.cycle_length = 365.25
-#times.units = 'days since 1900-01-01 00:00:00'
+#times.cycle_length = 365.25
+times.units = 'days since 1900-01-01 00:00:00'
 times.long_name = 'river runoff time'
 
 river = out.createVariable('river', 'i4', ('river'))
