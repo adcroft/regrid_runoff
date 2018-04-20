@@ -127,3 +127,12 @@ python add_dye.py
 ```
 
 Or just use the run\_regrid script...
+
+Note to self: If you change the land mask and some of the sanity checks
+start giving nan, rerun maskedge.py.
+
+8. I'm going with a second river file for the tracers now, including BGC tracers.
+
+```
+python add_bgc2.py river_tracers.nc
+```
