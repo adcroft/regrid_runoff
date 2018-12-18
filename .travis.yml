@@ -18,8 +18,8 @@ install:
 before_script:
   - mkdir -p test_data
   - pushd test_data
-  - test -f ocean_hgrid.nc || wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_05_grid.unpacked/ocean_hgrid.nc
-  - test -f ocean_static.nc || wget ftp://ftp.gfdl.noaa.gov/home/aja/OM4_05_grid.unpacked/ocean_static.nc
+  - test -f ocean_hgrid.nc || wget ftp://ftp.gfdl.noaa.gov/perm/Alistair.Adcroft/MOM6-testing/OM4_05/ocean_hgrid.nc
+  - test -f ocean_static.nc || wget ftp://ftp.gfdl.noaa.gov/perm/Alistair.Adcroft/MOM6-testing/OM4_05/ocean_static.nc
   - test -f runoff.daitren.clim.10FEB2011.nc || wget http://data1.gfdl.noaa.gov/~nnz/mom4/COREv2/data_IAF/CORRECTED/calendar_years/runoff.daitren.clim.10FEB2011.nc
   - popd
 
