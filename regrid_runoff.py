@@ -43,6 +43,8 @@ def parseCommandLine():
       help="""Number of records to write (default is to write all).""")
   parser.add_argument('--fms', action='store_true',
       help="""Add non-CF attributes to allow FMS to read data!""")
+  parser.add_argument('-z','--compress', action='store_true',
+      help="""Use compressed file format.""")
   parser.add_argument('-p','--progress', action='store_true',
       help="""Report progress.""")
   parser.add_argument('-q','--quiet', action='store_true',
@@ -243,7 +245,7 @@ def main(args):
 
   # Process runoff data
   if args.progress: tic = info('Regridding runoff and writing new file')
-  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, args.fms, args.num_records )
+  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, args.fms, args.num_records, compress=args.compress )
   if args.progress: end_info(tic)
 
   if not args.quiet:
