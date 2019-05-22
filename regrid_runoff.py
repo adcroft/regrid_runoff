@@ -72,10 +72,10 @@ def main(args):
 
   # Open ocean grid
   if args.progress: tic = info('Reading ocean grid')
-  ocn_qlon = netCDF4.Dataset(args.hgrid_file).variables['x'][::2,::2]   # Mesh longitudes (cell corners)
-  ocn_qlat = netCDF4.Dataset(args.hgrid_file).variables['y'][::2,::2] # Mesh latitudes (cell corners)
-  ocn_lon = netCDF4.Dataset(args.hgrid_file).variables['x'][1::2,1::2]    # Cell-center longitudes (cell centers)
-  ocn_lat = netCDF4.Dataset(args.hgrid_file).variables['y'][1::2,1::2]  # Cell-center latitudes (cell centers)
+  ocn_qlon = netCDF4.Dataset(args.hgrid_file).variables['x'][:][::2,::2]   # Mesh longitudes (cell corners)
+  ocn_qlat = netCDF4.Dataset(args.hgrid_file).variables['y'][:][::2,::2] # Mesh latitudes (cell corners)
+  ocn_lon = netCDF4.Dataset(args.hgrid_file).variables['x'][:][1::2,1::2]    # Cell-center longitudes (cell centers)
+  ocn_lat = netCDF4.Dataset(args.hgrid_file).variables['y'][:][1::2,1::2]  # Cell-center latitudes (cell centers)
   ocn_area = netCDF4.Dataset(args.hgrid_file).variables['area'][:]      # Super-grid cell areas
   ocn_area = ( ocn_area[::2,::2] + ocn_area[1::2,1::2] ) + ( ocn_area[1::2,::2] + ocn_area[::2,1::2] ) # Ocean-grid cell areas
   ocn_mask = netCDF4.Dataset(args.mask_file).variables[args.mask_var][:] # 1=ocean, 0=land
