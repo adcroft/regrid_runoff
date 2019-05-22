@@ -366,10 +366,14 @@ def brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, lat, lon):
   cost = numpy.abs( ocn_lat - lat) + numpy.abs( numpy.mod(ocn_lon - lon + 180, 360) - 180 )
   return numpy.argmin( cost )
 
-def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, fms_attr, num_records , toler=1e-15):
+def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, fms_attr, num_records , toler=1e-15, compress=False):
   """Regrids runoff data using sparse matrix A and write new file"""
 
-  new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format="NETCDF3_64BIT_OFFSET")
+  if compress:
+    fileformat, zlib, complevel, area_dtype = 'NETCDF4', True, 1, 'f4'
+  else:
+    fileformat, zlib, complevel, area_dtype = 'NETCDF3_64BIT_OFFSET', None, None, 'd'
+  new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format=fileformat)
   runoff = old_file.variables[var_name]
   if len(runoff.shape) == 3:
     time = runoff.dimensions[0]
@@ -451,7 +455,7 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   latq.long_name = 'Latitude of mesh nodes'
   latq.standard_name = 'latitude'
   latq.units = 'degrees_north'
-  area = new_file.createVariable('area', 'd', ('j','i',))
+  area = new_file.createVariable('area', area_dtype, ('j','i',))
   area.long_name = 'Cell area'
   area.standard_name = 'cell_area'
   area.units = 'm2'
@@ -462,10 +466,10 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   else:
     dims = ('j','i',)
   if '_FillValue' in old_file.variables[var_name].ncattrs():
-    new_runoff = new_file.createVariable(var_name, 'f4', dims, fill_value = old_file.variables[var_name]._FillValue)
+    new_runoff = new_file.createVariable(var_name, 'f4', dims, fill_value = old_file.variables[var_name]._FillValue, zlib=zlib, complevel=complevel)
     if fms_attr: new_runoff.missing_value = old_file.variables[var_name]._FillValue
   else:
-    new_runoff = new_file.createVariable(var_name, 'f4', dims)
+    new_runoff = new_file.createVariable(var_name, 'f4', dims, zlib=zlib, complevel=complevel)
   new_runoff.coordinates = 'lon lat'
   new_runoff.mesh_coordinates = 'lon_crnr lat_crnr'
   new_runoff.standard_name = 'runoff_flux'
