@@ -26,4 +26,6 @@ before_script:
 script:
   - ./regrid_runoff.py --help
   - ./regrid_runoff.py test_data/ocean_hgrid.nc test_data/ocean_static.nc -m wet test_data/runoff.daitren.clim.10FEB2011.nc test.nc -p
-  - md5sum test.nc
+  - ./regrid_runoff.py test_data/ocean_hgrid.nc test_data/ocean_static.nc -m wet test_data/runoff.daitren.clim.10FEB2011.nc test-f.nc -p -f
+  - ./regrid_runoff.py test_data/ocean_hgrid.nc test_data/ocean_static.nc -m wet test_data/runoff.daitren.clim.10FEB2011.nc test-fz.nc -p -f -z
+  - md5sum -c check.md5
