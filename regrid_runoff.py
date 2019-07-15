@@ -43,6 +43,8 @@ def parseCommandLine():
       help="""Number of records to write (default is to write all).""")
   parser.add_argument('--fms', action='store_true',
       help="""Add non-CF attributes to allow FMS to read data!""")
+  parser.add_argument('--fmst', action='store_true',
+      help="""Add non-CF modulo attributes to time for FMS!""")
   parser.add_argument('-z','--compress', action='store_true',
       help="""Use compressed file format.""")
   parser.add_argument('-p','--progress', action='store_true',
@@ -245,7 +247,7 @@ def main(args):
 
   # Process runoff data
   if args.progress: tic = info('Regridding runoff and writing new file')
-  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, args.fms, args.num_records, compress=args.compress )
+  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, args.fms, args.fmst, args.num_records, compress=args.compress )
   if args.progress: end_info(tic)
 
   if not args.quiet:
@@ -368,7 +370,7 @@ def brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, lat, lon):
   cost = numpy.abs( ocn_lat - lat) + numpy.abs( numpy.mod(ocn_lon - lon + 180, 360) - 180 )
   return numpy.argmin( cost )
 
-def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, fms_attr, num_records , toler=1e-15, compress=False):
+def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, fms_attr, fmst_attr, num_records , toler=1e-15, compress=False):
   """Regrids runoff data using sparse matrix A and write new file"""
 
   if compress:
@@ -435,6 +437,7 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
     t.long_name = 'Time'
     if fms_attr:
       t.cartesian_axis = 'T'
+    if fmst_attr:
       t.modulo = ' '
       if num_records>0:
         t.modulo_beg = '1948-01-01 00:00:00'
