@@ -431,9 +431,13 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   J = new_file.createVariable('JQ', 'f4', ('JQ',))
   J.long_name = 'Grid position along second dimension'
   if time is not None:
-    t = new_file.createVariable('time', 'd', ('time',))
+    if '_FillValue' in old_file.variables[time].ncattrs():
+      t = new_file.createVariable('time', 'd', ('time',), fill_value = old_file.variables[time]._FillValue)
+    else:
+      t = new_file.createVariable('time', 'd', ('time',))
     for a in old_file.variables[time].ncattrs():
-      t.setncattr(a, old_file.variables[time].getncattr(a))
+      if a != '_FillValue':
+        t.setncattr(a, old_file.variables[time].getncattr(a))
     t.long_name = 'Time'
     if fms_attr:
       t.cartesian_axis = 'T'
