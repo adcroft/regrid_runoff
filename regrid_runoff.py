@@ -436,7 +436,8 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
     else:
       t = new_file.createVariable('time', 'd', ('time',))
     for a in old_file.variables[time].ncattrs():
-      t.setncattr(a, old_file.variables[time].getncattr(a))
+      if a != '_FillValue':
+        t.setncattr(a, old_file.variables[time].getncattr(a))
     t.long_name = 'Time'
     if fms_attr:
       t.cartesian_axis = 'T'
