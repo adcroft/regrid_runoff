@@ -20,7 +20,7 @@ ever one cell away from and land-masked cell.
 
 ## Algorithm
 
-An [example notebook](https://github.com/adcroft/regrid_runoff/blob/master/Regrid%20runoff%20data.ipynb)
+An [example notebook](https://nbviewer.jupyter.org/github/adcroft/regrid_runoff/blob/master/Regrid%20runoff%20data.ipynb)
 (used for development) illustrates the procedure:
 1. Define and find the "coastal cells" on the target ocean model grid
    - I currently use the definition "Any wet cell with a land cell to the north, south, east, or west".

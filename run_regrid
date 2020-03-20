@@ -1,10 +1,11 @@
 year=1980
 
-python regrid_runoff.py ARCTIC4 --regional -f /import/c1/AKWATERS/kate/JRA55-do/runoff_all.${year}.15Dec2016.nc Arctic4_runoff_${year}.nc
+python regrid_runoff.py ARCTIC4 -z --regional_domain -f /import/c1/AKWATERS/kate/JRA55-do/runoff_JRA55-do-1-4-0_${year}.nc Arctic4_runoff_${year}.nc
 python add_rivers.py JRA_Arctic_rivers_${year}.nc
 python make_river_clim.py Arctic4_runoff_${year}.nc JRA_Arctic_rivers_${year}.nc
-python squeeze_rivers.py JRA_Arctic_rivers_${year}.nc squeeze.nc
-mv squeeze.nc JRA_Arctic_rivers_${year}.nc
+# Squeeze is not a good idea for JRA in the Arctic where there are different numbers of rivers for different years.
+#python squeeze_rivers.py JRA_Arctic_rivers_${year}.nc squeeze.nc
+#mv squeeze.nc JRA_Arctic_rivers_${year}.nc
 python add_temp.py JRA_Arctic_rivers_${year}.nc
 python set_vshape.py JRA_Arctic_rivers_${year}.nc
 

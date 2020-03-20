@@ -40,12 +40,16 @@ def parseCommandLine():
       help="""Number of records to write (default is to write all).""")
   parser.add_argument('--fms', action='store_true',
       help="""Add non-CF attributes to allow FMS to read data!""")
+  parser.add_argument('--fmst', action='store_true',
+      help="""Add non-CF modulo attributes to time for FMS!""")
+  parser.add_argument('-z','--compress', action='store_true',
+      help="""Use compressed file format.""")
   parser.add_argument('-p','--progress', action='store_true',
       help="""Report progress.""")
   parser.add_argument('-q','--quiet', action='store_true',
       help="""Disable informational messages.""")
-  parser.add_argument('--regional', action='store_true',
-      help="""For regional domains, don't assume tripolar, don't include remote rivers.""")
+  parser.add_argument('-reg','--regional_domain', action='store_true',
+      help="""Disable periodicity for regional applications.""")
 
   return parser.parse_args()
 
@@ -192,15 +196,13 @@ def main(args):
     if not args.quiet:
       print('%i/%i river cells without associated ocean id (first pass).'%((rvr_oid<0).sum(),rvr_oid.size))
 
-    # Let some rivers be unmapped for regional domains (no Amazon in my usual domains)
-    if not args.regional:
-      if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
-      for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
-        rj, ri = int(rid/rvr_ni), rid%rvr_ni
-        oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
-        rvr_oid[rj, ri] = oid
-      del ri, rj, oid, rid
-      if args.progress: end_info(tic)
+    if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
+    for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
+      rj, ri = int(rid/rvr_ni), rid%rvr_ni
+      oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
+      rvr_oid[rj, ri] = oid
+    del ri, rj, oid, rid
+    if args.progress: end_info(tic)
 
     if not args.quiet:
       print('%i/%i river cells without associated ocean id.'%((rvr_oid<0).sum(),rvr_oid.size))
@@ -251,7 +253,7 @@ def main(args):
 
   # Process runoff data
   if args.progress: tic = info('Regridding runoff and writing new file')
-  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, args.fms, args.num_records )
+  totals = regrid_runoff(runoff_file, args.runoff_var, A, args.out_file, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, args.fms, args.fmst, args.num_records, compress=args.compress )
   if args.progress: end_info(tic)
 
   if not args.quiet:
@@ -265,10 +267,14 @@ def nearest_coastal_cell( ocn_id, cst_mask ):
   while (cst_nrst_ocn_id<0).sum()>0:
     # Look east
     difm = numpy.roll( ocidm, -1, axis=1) - ocidm
+    if args.regional_domain:
+       difm[:,-1] = 0 # Non-periodic across east
     cst_nrst_ocn_id[ difm>0 ] = numpy.roll( cst_nrst_ocn_id, -1, axis=1)[ difm>0 ]
     ocidm[ cst_nrst_ocn_id>=0 ] = 1 # Flag all that have been assigned
     # Look west
     difm = numpy.roll( ocidm, 1, axis=1) - ocidm
+    if args.regional_domain:
+       difm[:,0] = 0 # Non-periodic across west
     cst_nrst_ocn_id[ difm>0 ] = numpy.roll( cst_nrst_ocn_id, 1, axis=1)[ difm>0 ]
     ocidm[ cst_nrst_ocn_id>=0 ] = 1 # Flag all that have been assigned
     # Look south
@@ -374,10 +380,14 @@ def brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, lat, lon):
   cost = numpy.abs( ocn_lat - lat) + numpy.abs( numpy.mod(ocn_lon - lon + 180, 360) - 180 )
   return numpy.argmin( cost )
 
-def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, fms_attr, num_records , toler=1e-15):
+def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn_qlat, ocn_qlon, ocn_lat, ocn_lon, rvr_area, fms_attr, fmst_attr, num_records , toler=1e-15, compress=False):
   """Regrids runoff data using sparse matrix A and write new file"""
 
-  new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format="NETCDF3_64BIT_OFFSET")
+  if compress:
+    fileformat, zlib, complevel, area_dtype = 'NETCDF4', True, 1, 'f4'
+  else:
+    fileformat, zlib, complevel, area_dtype = 'NETCDF3_64BIT_OFFSET', None, None, 'd'
+  new_file = netCDF4.Dataset(new_file_name, 'w', 'clobber', format=fileformat)
   runoff = old_file.variables[var_name]
   if len(runoff.shape) == 3:
     time = runoff.dimensions[0]
@@ -431,12 +441,17 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   J = new_file.createVariable('JQ', 'f4', ('JQ',))
   J.long_name = 'Grid position along second dimension'
   if time is not None:
-    t = new_file.createVariable('time', 'd', ('time',))
+    if '_FillValue' in old_file.variables[time].ncattrs():
+      t = new_file.createVariable('time', 'd', ('time',), fill_value = old_file.variables[time]._FillValue)
+    else:
+      t = new_file.createVariable('time', 'd', ('time',))
     for a in old_file.variables[time].ncattrs():
-      t.setncattr(a, old_file.variables[time].getncattr(a))
+      if a != '_FillValue':
+        t.setncattr(a, old_file.variables[time].getncattr(a))
     t.long_name = 'Time'
     if fms_attr:
       t.cartesian_axis = 'T'
+    if fmst_attr:
       t.modulo = ' '
       if num_records>0:
         t.modulo_beg = '1948-01-01 00:00:00'
@@ -459,7 +474,7 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   latq.long_name = 'Latitude of mesh nodes'
   latq.standard_name = 'latitude'
   latq.units = 'degrees_north'
-  area = new_file.createVariable('area', 'd', ('j','i',))
+  area = new_file.createVariable('area', area_dtype, ('j','i',))
   area.long_name = 'Cell area'
   area.standard_name = 'cell_area'
   area.units = 'm2'
@@ -470,10 +485,10 @@ def regrid_runoff( old_file, var_name, A, new_file_name, ocn_area, ocn_mask, ocn
   else:
     dims = ('j','i',)
   if '_FillValue' in old_file.variables[var_name].ncattrs():
-    new_runoff = new_file.createVariable(var_name, 'f4', dims, fill_value = old_file.variables[var_name]._FillValue)
+    new_runoff = new_file.createVariable(var_name, 'f4', dims, fill_value = old_file.variables[var_name]._FillValue, zlib=zlib, complevel=complevel)
     if fms_attr: new_runoff.missing_value = old_file.variables[var_name]._FillValue
   else:
-    new_runoff = new_file.createVariable(var_name, 'f4', dims)
+    new_runoff = new_file.createVariable(var_name, 'f4', dims, zlib=zlib, complevel=complevel)
   new_runoff.coordinates = 'lon lat'
   new_runoff.mesh_coordinates = 'lon_crnr lat_crnr'
   new_runoff.standard_name = 'runoff_flux'
