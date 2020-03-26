@@ -156,7 +156,7 @@ def main(args):
     cst_mask[ (ocn_mask>0) & (numpy.roll(ocn_mask,1,axis=0)==0) ] = 1 # Land to the south
     #cst_mask[ (ocn_mask>0) & (numpy.roll(numpy.roll(ocn_mask,1,axis=0),1,axis=1)==0) ] = 1 # Land to the south-west
     #cst_mask[ (ocn_mask>0) & (numpy.roll(numpy.roll(ocn_mask,1,axis=0),-1,axis=1)==0) ] = 1 # Land to the south-east
-    if args.regional:
+    if args.regional_domain:
       # Might have to get rid of all the "roll" stuff too
       cst_mask[ (ocn_mask>0) & (numpy.roll(ocn_mask,-1,axis=0)==0) ] = 1 # Land to the north
     else:
@@ -196,13 +196,15 @@ def main(args):
     if not args.quiet:
       print('%i/%i river cells without associated ocean id (first pass).'%((rvr_oid<0).sum(),rvr_oid.size))
 
-    if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
-    for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
-      rj, ri = int(rid/rvr_ni), rid%rvr_ni
-      oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
-      rvr_oid[rj, ri] = oid
-    del ri, rj, oid, rid
-    if args.progress: end_info(tic)
+    # Let some rivers be unmapped for regional domains (no Amazon in my usual domains)
+    if not args.regional_domain:
+      if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
+      for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
+        rj, ri = int(rid/rvr_ni), rid%rvr_ni
+        oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
+        rvr_oid[rj, ri] = oid
+      del ri, rj, oid, rid
+      if args.progress: end_info(tic)
 
     if not args.quiet:
       print('%i/%i river cells without associated ocean id.'%((rvr_oid<0).sum(),rvr_oid.size))
@@ -214,6 +216,13 @@ def main(args):
     oids = rvr_oid.flatten()[rids] # debug without coastal mapping
     Arow[oids,rids] = rvr_area.flatten()[rids]
     del rids, oids
+
+    if args.regional_domain:
+      rids = rvr_id[rvr_oid.flatten()<0]
+      oids = rvr_oid.flatten()[rids] # debug without coastal mapping
+      Arow[oids,rids] = 0
+      del rids, oids
+
     if args.progress: end_info(tic)
 
     if args.progress: tic = info('Constructing regridding matrix for ocean cells with many river cells')

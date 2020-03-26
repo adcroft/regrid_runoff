@@ -56,7 +56,7 @@ moves them all to the NE corner (-1,-1) which routes it to a coastal point near 
 set those values to zero in the make\_rivers\_clim script, not a completely satisfactory fix.
 ```
 ./regrid_runoff.py -h
-./regrid_runoff.py ARCTIC4 --regional -f runoff_all.1980.nc Arctic4_runoff_1980.nc
+./regrid_runoff.py ARCTIC4 --regional_domain -r friver -f runoff_all.1980.nc Arctic4_runoff_1980.nc
 
 ```
 
