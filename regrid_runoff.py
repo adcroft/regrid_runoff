@@ -51,6 +51,10 @@ def parseCommandLine():
       help="""Report progress.""")
   parser.add_argument('-q','--quiet', action='store_true',
       help="""Disable informational messages.""")
+  parser.add_argument('-reg','--regional_domain', action='store_true',
+      help="""Disable periodicity for regional applications.""")
+
+
 
   return parser.parse_args()
 
@@ -189,18 +193,20 @@ def main(args):
 
     if not args.quiet:
       print('%i/%i river cells without associated ocean id (first pass).'%((rvr_oid<0).sum(),rvr_oid.size))
-   
-    if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
-    for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
-      rj, ri = int(rid/rvr_ni), rid%rvr_ni
-      oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
-      rvr_oid[rj, ri] = oid
-    del ri, rj, oid, rid
-    if args.progress: end_info(tic)
+
+    # Let some rivers be unmapped for regional domains (no Amazon in my usual domains)
+    if not args.regional_domain:
+      if args.progress: tic = info('Filling in remaining river cells by brute force (should take ~%.1fs)'%(120*ocn_mask.size/(1080*1440)))
+      for rid in rvr_id[ (rvr_oid.flatten()<0) ]:
+        rj, ri = int(rid/rvr_ni), rid%rvr_ni
+        oid = brute_force_search_for_ocn_ij( ocn_lat, ocn_lon, rvr_lat[rj], rvr_lon[ri])
+        rvr_oid[rj, ri] = oid
+      del ri, rj, oid, rid
+      if args.progress: end_info(tic)
 
     if not args.quiet:
       print('%i/%i river cells without associated ocean id.'%((rvr_oid<0).sum(),rvr_oid.size))
-   
+
     # Construct sparse matrices
     if args.progress: tic = info('Constructing regridding matrix for river cells with many ocean cells')
     Arow = scipy.sparse.lil_matrix( (ocn_nj*ocn_ni, rvr_nj*rvr_ni), dtype=numpy.double )
@@ -208,6 +214,13 @@ def main(args):
     oids = rvr_oid.flatten()[rids] # debug without coastal mapping
     Arow[oids,rids] = rvr_area.flatten()[rids]
     del rids, oids
+
+    if args.regional_domain:
+      rids = rvr_id[rvr_oid.flatten()<0]
+      oids = rvr_oid.flatten()[rids] # debug without coastal mapping
+      Arow[oids,rids] = 0
+      del rids, oids
+
     if args.progress: end_info(tic)
 
     if args.progress: tic = info('Constructing regridding matrix for ocean cells with many river cells')
@@ -261,10 +274,14 @@ def nearest_coastal_cell( ocn_id, cst_mask ):
   while (cst_nrst_ocn_id<0).sum()>0:
     # Look east
     difm = numpy.roll( ocidm, -1, axis=1) - ocidm
+    if args.regional_domain:
+       difm[:,-1] = 0 # Non-periodic across east
     cst_nrst_ocn_id[ difm>0 ] = numpy.roll( cst_nrst_ocn_id, -1, axis=1)[ difm>0 ]
     ocidm[ cst_nrst_ocn_id>=0 ] = 1 # Flag all that have been assigned
     # Look west
     difm = numpy.roll( ocidm, 1, axis=1) - ocidm
+    if args.regional_domain:
+       difm[:,0] = 0 # Non-periodic across west
     cst_nrst_ocn_id[ difm>0 ] = numpy.roll( cst_nrst_ocn_id, 1, axis=1)[ difm>0 ]
     ocidm[ cst_nrst_ocn_id>=0 ] = 1 # Flag all that have been assigned
     # Look south
