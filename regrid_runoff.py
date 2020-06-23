@@ -9,7 +9,6 @@ import pickle
 import scipy.sparse
 import sys
 import time
-import pyroms
 
 def parseCommandLine():
   """
@@ -23,12 +22,16 @@ def parseCommandLine():
       """,
       epilog='Written by A.Adcroft, 2018.')
   parser.add_argument('hgrid_file', type=str,
-      help="""Filename for ocean horizontal grid (pyroms gridid).""")
+      help="""Filename for ocean horizontal grid (super-grid format).""")
+  parser.add_argument('mask_file', type=str,
+      help="""Filename for ocean mask.""")
   parser.add_argument('runoff_file', type=str,
       help="""Filename for gridded source runoff data.""")
   parser.add_argument('out_file', type=str,
       help="""Filename for runoff data on ocean model grid.""")
-  parser.add_argument('-r','--runoff_var', type=str, default='friver',
+  parser.add_argument('-m','--mask_var', type=str, default='mask',
+      help="""Name of mask variable in mask_file.""")
+  parser.add_argument('-r','--runoff_var', type=str, default='runoff',
       help="""Name of runoff variable in runoff_file.""")
   parser.add_argument('-a','--ignore_area', action='store_true',
       help="""Ignore the "area" variable in the source runoff file.""")
@@ -50,6 +53,8 @@ def parseCommandLine():
       help="""Disable informational messages.""")
   parser.add_argument('-reg','--regional_domain', action='store_true',
       help="""Disable periodicity for regional applications.""")
+
+
 
   return parser.parse_args()
 
@@ -73,16 +78,13 @@ def main(args):
 
   # Open ocean grid
   if args.progress: tic = info('Reading ocean grid')
-  ocn_grd = pyroms.grid.get_ROMS_grid(args.hgrid_file)
-  print('grid size', ocn_grd.hgrid.mask_rho.shape)
-  ocn_qlon = ocn_grd.hgrid.lon_psi[:,:]   # Mesh longitudes (cell corners)
-  ocn_qlat = ocn_grd.hgrid.lat_psi[:,:]   # Mesh latitudes (cell corners)
-  ocn_lon = ocn_grd.hgrid.lon_rho[1:-1,1:-1]    # Cell-center longitudes (cell centers)
-  ocn_lat = ocn_grd.hgrid.lat_rho[1:-1,1:-1]    # Cell-center latitudes (cell centers)
-  ocn_dx = ocn_grd.hgrid.dx[1:-1,1:-1]
-  ocn_dy = ocn_grd.hgrid.dy[1:-1,1:-1]
-  ocn_area = ocn_dx*ocn_dy                   # Ocean-grid cell areas
-  ocn_mask = ocn_grd.hgrid.mask_rho[1:-1,1:-1]  # Ocean-grid cell mask
+  ocn_qlon = netCDF4.Dataset(args.hgrid_file).variables['x'][:][::2,::2]   # Mesh longitudes (cell corners)
+  ocn_qlat = netCDF4.Dataset(args.hgrid_file).variables['y'][:][::2,::2] # Mesh latitudes (cell corners)
+  ocn_lon = netCDF4.Dataset(args.hgrid_file).variables['x'][:][1::2,1::2]    # Cell-center longitudes (cell centers)
+  ocn_lat = netCDF4.Dataset(args.hgrid_file).variables['y'][:][1::2,1::2]  # Cell-center latitudes (cell centers)
+  ocn_area = netCDF4.Dataset(args.hgrid_file).variables['area'][:]      # Super-grid cell areas
+  ocn_area = ( ocn_area[::2,::2] + ocn_area[1::2,1::2] ) + ( ocn_area[1::2,::2] + ocn_area[::2,1::2] ) # Ocean-grid cell areas
+  ocn_mask = netCDF4.Dataset(args.mask_file).variables[args.mask_var][:] # 1=ocean, 0=land
   ocn_nj, ocn_ni = ocn_mask.shape
   ocn_id = numpy.arange( ocn_nj*ocn_ni ).reshape(ocn_mask.shape)
   if args.progress: end_info(tic)
@@ -156,16 +158,12 @@ def main(args):
     cst_mask[ (ocn_mask>0) & (numpy.roll(ocn_mask,1,axis=0)==0) ] = 1 # Land to the south
     #cst_mask[ (ocn_mask>0) & (numpy.roll(numpy.roll(ocn_mask,1,axis=0),1,axis=1)==0) ] = 1 # Land to the south-west
     #cst_mask[ (ocn_mask>0) & (numpy.roll(numpy.roll(ocn_mask,1,axis=0),-1,axis=1)==0) ] = 1 # Land to the south-east
-    if args.regional_domain:
-      # Might have to get rid of all the "roll" stuff too
-      cst_mask[ (ocn_mask>0) & (numpy.roll(ocn_mask,-1,axis=0)==0) ] = 1 # Land to the north
-    else:
-      nom = numpy.roll(ocn_mask,-1,axis=0) # Shift southward
-      nom[-1,:] = ocn_mask[-1,::-1] # Tri-polar fold
-      cst_mask[ (ocn_mask>0) & (nom==0) ] = 1 # Land to the north
+    nom = numpy.roll(ocn_mask,-1,axis=0) # Shift southward
+    nom[-1,:] = ocn_mask[-1,::-1] # Tri-polar fold
+    cst_mask[ (ocn_mask>0) & (nom==0) ] = 1 # Land to the north
     #cst_mask[ (ocn_mask>0) & (numpy.roll(nom,1,axis=1)==0) ] = 1 # Land to the north-west
     #cst_mask[ (ocn_mask>0) & (numpy.roll(nom,-1,axis=1)==0) ] = 1 # Land to the north-east
-      del nom # Clean up
+    del nom # Clean up
     if args.progress: end_info(tic)
 
     if not args.quiet:
