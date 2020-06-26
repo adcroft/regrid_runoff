@@ -51,6 +51,10 @@ def parseCommandLine():
       help="""Report progress.""")
   parser.add_argument('-q','--quiet', action='store_true',
       help="""Disable informational messages.""")
+  parser.add_argument('-reg','--regional_domain', action='store_true',
+      help="""Disable periodicity for regional applications.""")
+
+
 
   return parser.parse_args()
 
@@ -261,10 +265,14 @@ def nearest_coastal_cell( ocn_id, cst_mask ):
   while (cst_nrst_ocn_id<0).sum()>0:
     # Look east
     difm = numpy.roll( ocidm, -1, axis=1) - ocidm
+    if args.regional_domain:
+       difm[:,-1] = 0 # Non-periodic across east
     cst_nrst_ocn_id[ difm>0 ] = numpy.roll( cst_nrst_ocn_id, -1, axis=1)[ difm>0 ]
     ocidm[ cst_nrst_ocn_id>=0 ] = 1 # Flag all that have been assigned
-    # Look west
+    # Look west 
     difm = numpy.roll( ocidm, 1, axis=1) - ocidm
+    if args.regional_domain:
+       difm[:,0] = 0 # Non-periodic across west
     cst_nrst_ocn_id[ difm>0 ] = numpy.roll( cst_nrst_ocn_id, 1, axis=1)[ difm>0 ]
     ocidm[ cst_nrst_ocn_id>=0 ] = 1 # Flag all that have been assigned
     # Look south
