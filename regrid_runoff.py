@@ -280,7 +280,7 @@ def nearest_coastal_cell( ocn_id, cst_mask ):
   return cst_nrst_ocn_id
 
 class kdtree:
-  @jit
+  @jit(nopython=False,forceobj=True)
   def __init__(self, lat, lon, level=0, i0=None, i1=None, j0=None, j1=None):
     """Contructs a k-d tree for a mesh with nodes at (lon,lat)."""
     self.level = level
@@ -313,13 +313,13 @@ class kdtree:
         self.leaves.append(di)
       self.xmin, self.xmax = xmin, xmax
       self.ymin, self.ymax = ymin, ymax
-  @jit
+  @jit(nopython=True)
   def first_divisor(n):
     """Returns the smallest, non-unity divisor of n."""
     for d in range(2,n//2+1):
       if n%d==0: return d
     return n
-  @jit
+  @jit(nopython=True)
   def sign_of_loc_p_on_ab(a_lon, a_lat, b_lon, b_lat, p_lon, p_lat):
     """Returns positive real if P to the right of AB, negative if to the left, and zero if P is on AB
     or AB has zero length."""
@@ -329,7 +329,6 @@ class kdtree:
     return False
   def id2s(self):
     return ' '*self.level + '%i:%i-%i,%i-%i'%(self.level,self.j0,self.j1,self.i0,self.i1)
-  #@jit
   def find_cell(self, lat, lon):
     # First bounding box to reject (to minimize cost)
     if lat<self.ymin:
