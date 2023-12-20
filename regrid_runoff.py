@@ -72,15 +72,23 @@ def main(args):
   start_time = time.time()
   pickle_file = 'pickle.regrid_runoff_A'
 
+  def read_ncvar(filename, varname):
+    """Read a variable and convert to unmasked array.
+       This is needed because earlier versions of netCDF4 used to not always return a masked array"""
+    q = netCDF4.Dataset(filename).variables[varname][:]
+    if isinstance( q, numpy.ma.core.MaskedArray ):
+      q = q.filled(0.)
+    return q
+
   # Open ocean grid
   if args.progress: tic = info('Reading ocean grid')
-  ocn_qlon = netCDF4.Dataset(args.hgrid_file).variables['x'][:][::2,::2]   # Mesh longitudes (cell corners)
-  ocn_qlat = netCDF4.Dataset(args.hgrid_file).variables['y'][:][::2,::2] # Mesh latitudes (cell corners)
-  ocn_lon = netCDF4.Dataset(args.hgrid_file).variables['x'][:][1::2,1::2]    # Cell-center longitudes (cell centers)
-  ocn_lat = netCDF4.Dataset(args.hgrid_file).variables['y'][:][1::2,1::2]  # Cell-center latitudes (cell centers)
-  ocn_area = netCDF4.Dataset(args.hgrid_file).variables['area'][:]      # Super-grid cell areas
+  ocn_qlon = read_ncvar(args.hgrid_file, 'x')[::2,::2] # Mesh longitudes (cell corners)
+  ocn_qlat = read_ncvar(args.hgrid_file, 'y')[::2,::2] # Mesh latitudes (cell corners)
+  ocn_lon = read_ncvar(args.hgrid_file, 'x')[1::2,1::2] # Cell-center longitudes (cell centers)
+  ocn_lat = read_ncvar(args.hgrid_file, 'y')[1::2,1::2] # Cell-center latitudes (cell centers)
+  ocn_area = read_ncvar(args.hgrid_file, 'area') # Super-grid cell areas
   ocn_area = ( ocn_area[::2,::2] + ocn_area[1::2,1::2] ) + ( ocn_area[1::2,::2] + ocn_area[::2,1::2] ) # Ocean-grid cell areas
-  ocn_mask = netCDF4.Dataset(args.mask_file).variables[args.mask_var][:] # 1=ocean, 0=land
+  ocn_mask = read_ncvar(args.mask_file, args.mask_var) # 1=ocean, 0=land
   ocn_nj, ocn_ni = ocn_mask.shape
   ocn_id = numpy.arange( ocn_nj*ocn_ni ).reshape(ocn_mask.shape)
   if args.progress: end_info(tic)
